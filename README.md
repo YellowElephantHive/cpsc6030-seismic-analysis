@@ -126,4 +126,4 @@ Seismic Analysis/
 
 - Yu-Chun Lai
 - Sanjeev Sharma
-- Connor Mcgrath
+- Connor McGrath
