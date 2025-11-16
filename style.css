@@ -1,0 +1,65 @@
+:root{--gap:16px;--sidebar-w:clamp(320px,30vw,960px);--header-h:64px}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,sans-serif;color:#222}
+header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.2) blur(6px);padding:10px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:16px}
+h1{font-size:18px;margin:0;font-weight:600}
+.panel{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.control{display:flex;align-items:center;gap:8px}
+.control label{font-size:13px;color:#555;white-space:nowrap}
+/* Layout: Map on the left, two line charts stacked on the right */
+#chart{display:grid;grid-template-columns:minmax(0,1fr) var(--sidebar-w);grid-auto-rows:min-content;gap:var(--gap);align-items:start;padding:12px 16px}
+#mapWrap{position:relative;min-width:0}
+#map{width:100%;height:calc(100vh - var(--header-h) - 24px);display:block;background:#fff}
+
+.tooltip{position:absolute;pointer-events:none;background:rgba(255,255,255,0.95);border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+
+.topleft{position:absolute;left:16px;top:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;z-index:10;pointer-events:none}
+#hist{background:rgba(255,255,255,.9);border:1px solid #eee;border-radius:10px}
+.legend{position:static;background:rgba(255,255,255,.9);border:1px solid #eee;border-radius:10px;padding:8px 10px;font-size:12px;color:#444;box-shadow:0 2px 8px rgba(0,0,0,.06);pointer-events:auto}
+.legend .row{display:flex;align-items:center;gap:8px;margin:4px 0}
+.legend .dot{width:18px;height:12px;border-radius:3px;border:1px solid #cfcfcf}
+.plate-layer{pointer-events:none}
+.year-badge{font-variant-numeric:tabular-nums;background:#f6f6f6;padding:2px 6px;border-radius:6px;border:1px solid #eee}
+.credit{position:absolute;left:16px;bottom:16px;font-size:11px;color:#777}
+
+/* Right-side line chart cards */
+.side{display:flex;flex-direction:column;gap:var(--gap);padding-right:0;position:sticky;top:calc(var(--header-h) + 12px);height:calc(100vh - var(--header-h) - 24px);overflow:auto;min-width:var(--sidebar-w);max-width:var(--sidebar-w)}
+.card{border:1px solid #eee;border-radius:10px;padding:10px;background:#fff;height:calc((100vh - var(--header-h) - 24px - var(--gap)) / 2);display:flex;flex-direction:column;width:100%}
+.card h3{margin:0 0 6px 0;font-size:13px;color:#444}
+svg.sideplot{width:100%;height:auto;display:block;flex:1}
+.card text{font-size:10px}
+
+/* side-mode switch */
+.mode-switch{display:flex;align-items:center;gap:8px}
+.switch{
+  position:relative;display:inline-block;width:46px;height:24px
+}
+.switch input{opacity:0;width:0;height:0}
+.slider{
+  position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ddd;transition:.2s;border-radius:999px
+}
+.slider:before{
+  position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;transition:.2s;border-radius:50%
+}
+input:checked + .slider{background:#3b82f6}
+input:checked + .slider:before{transform:translateX(22px)}
+
+/* Responsive tweaks */
+@media (max-width:1280px){
+  :root{--sidebar-w:clamp(280px,28vw,880px)}
+  #hist{transform:scale(.95);transform-origin:top left}
+}
+@media (max-width:1100px){
+  #chart{grid-template-columns:1fr}
+  .side{position:static;height:auto;padding-right:0}
+  .card{height:auto}
+  svg.sideplot{height:200px;flex:none}
+  .topleft{left:12px;top:12px}
+  #hist{width:220px;height:120px}
+}
+@media (max-width:720px){
+  svg.sideplot{height:180px}
+  .legend{font-size:11px}
+  .control label{font-size:12px}
+}

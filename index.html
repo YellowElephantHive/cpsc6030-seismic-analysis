@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <title>Occurrence of Earthquakes — D3 (Quantile + Plate density)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <!-- External CSS -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Occurrence of Earthquakes</h1>
+    <div class="panel">
+      <div class="control">
+        <label>Year</label>
+        <input id="yearMin" type="number" style="width:76px" />
+        <input id="yearRange" type="range" min="1900" max="2025" step="1" />
+        <input id="yearMax" type="number" style="width:76px" />
+        <span class="year-badge" id="yearBadge"></span>
+      </div>
+      <div class="control" id="typeFilters">
+        <label style="margin-right:4px">Type</label>
+      </div>
+      <div class="control">
+        <label><input id="togglePlates" type="checkbox" /> Density overlay</label>
+      </div>
+      <!-- Side panel mode: line charts vs scatter plots -->
+      <div class="control mode-switch" title="Switch side panel between line charts and scatter plots">
+        <span style="font-size:13px;color:#555">Side panel</span>
+        <span style="font-size:12px;color:#888">Line</span>
+        <label class="switch">
+          <input id="toggleSideMode" type="checkbox" />
+          <span class="slider"></span>
+        </label>
+        <span style="font-size:12px;color:#888">Scatter</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="chart">
+    <!-- Left: Map -->
+    <div id="mapWrap">
+      <svg id="map"></svg>
+      <div class="tooltip" id="tooltip" style="opacity:0"></div>
+      <div class="topleft">
+        <svg id="hist" width="260" height="130"></svg>
+        <div class="legend" id="legend">
+          <div class="row"><strong>Magnitude (Quantile)</strong></div>
+          <div id="legendRows"></div>
+        </div>
+      </div>
+      <div class="credit">© Natural Earth • Map: World 1:110m • D3 rendering</div>
+    </div>
+
+    <!-- Right: Two line charts -->
+    <div class="side">
+      <div class="card">
+        <h3 id="cardTitleA">Trends of Earthquake Events</h3>
+        <svg id="countLine" class="sideplot"></svg>
+      </div>
+      <div class="card">
+        <h3 id="cardTitleB">Trends of Average Magnitude</h3>
+        <svg id="avgMagLine" class="sideplot"></svg>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
