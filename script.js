@@ -33,7 +33,10 @@
 
   // side panel mode: 'line' (default) or 'scatter'
   let sideMode = 'line';
+  let selectedType = null; // currently selected type from the barchart (or null = all)
   const toggleSide = document.getElementById('toggleSideMode');
+  let pickedYears = new Set();          // Currently selected years (0, 1, or 2 years)
+  let baseYearRange = null;
 
   // 2.5) Plate density from all.csv
   let plateBase = [];
@@ -61,14 +64,28 @@
   const yearBadge  = document.getElementById('yearBadge');
 
   yearRange.min = startY;        // slider lower bound 1965
-  yearRange.max = yearMaxData;
-  yearRange.value = startY;      // slider initial 1965
-  yearMinInp.value = startY;     // left input 1965
-  yearMaxInp.value = startY;     // right input 1965
-  yearBadge.textContent = `${startY} – ${startY}`;
+  yearRange.max = yearMaxData;   // slider upper bound last data year
+  yearRange.value = yearMaxData; // slider starts at the latest year
+
+  // numeric inputs: start from full range [startY, yearMaxData]
+  yearMinInp.value = startY;     // left input = earliest year (1965)
+  yearMaxInp.value = yearMaxData;// right input = latest year (e.g., 2016)
+
+  // badge shows the full range on load
+  yearBadge.textContent = `${startY} – ${yearMaxData}`;
 
   // 3) Type filters (checkboxes)
   const typeSet = Array.from(new Set(clean.map(d => d.type))).sort();
+
+  // Color scale for event types (used by barchart + line chart)
+  const typeColor = d3.scaleOrdinal()
+    .domain(typeSet)
+    .range(d3.schemeSet2 ? d3.schemeSet2.slice(0, typeSet.length) :
+      [
+        "#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f","#e5c494","#b3b3b3"
+      ].slice(0,typeSet.length)
+    );
+
   const typeFilters = d3.select('#typeFilters');
   typeSet.forEach(t => {
     const w = typeFilters.append('label')
@@ -171,7 +188,7 @@
     );
   }
 
-  function filtered(){
+  function baseFiltered(){
     const minY = +yearMinInp.value;
     const maxY = +yearMaxInp.value;
     const tset = activeTypes();
@@ -183,8 +200,20 @@
     );
   }
 
+  function filtered(){
+    const base = baseFiltered();
+    if (!selectedType) return base;
+    return base.filter(d => d.type === selectedType);
+  }
+
   function render(){
-    const pts = filtered();
+    // baseMap: respects current yearMin/yearMax + type checkboxes (for map / histogram / bar)
+    const baseMap = baseFiltered();
+    const pts  = selectedType ? baseMap.filter(d => d.type === selectedType) : baseMap;
+
+    // baseLine: ignores yearMin/yearMax, only applies type checkboxes
+    const tsetForLine = activeTypes();
+    const baseLine = clean.filter(d => tsetForLine.has(d.type));
 
     // map points
     gPoints.selectAll('circle')
@@ -210,11 +239,17 @@
     // histogram (subset)
     renderMagnitudeHistogram(pts.map(d => d.mag), qBreaks, colorQuant);
 
-    // side panel: line charts or scatter plots
     if (sideMode === 'line'){
-      const yearly = aggregateByYear(pts);
-      renderCountLine(yearly);
-      renderAvgMagLine(yearly);
+      if (selectedType){
+        // 單一 type：線圖使用完整年份，但只看目前選取的 type
+        const yearly = aggregateByYear(baseLine.filter(d => d.type === selectedType));
+        renderCountLine(yearly, selectedType);
+      }else{
+        // 多 type：線圖使用完整年份的所有 type
+        renderCountLineAllTypes(baseLine);
+      }
+      // barchart 仍然跟著目前 yearMin/yearMax 的範圍
+      renderTypeBar(baseMap);
     }else{
       renderScatterPanels(pts);
     }
@@ -223,14 +258,16 @@
     const titleA = document.getElementById('cardTitleA');
     const titleB = document.getElementById('cardTitleB');
     if (sideMode === 'line'){
-      titleA.textContent = 'Trends of Earthquake Events';
-      titleB.textContent = 'Trends of Average Magnitude';
+      titleA.textContent = selectedType
+        ? `Trends of ${selectedType} Events`
+        : 'Trends of Events by Type';
+      titleB.textContent = 'Average magnitude by type';
     }else{
       titleA.textContent = 'Magnitude vs. Horizontal Distance';
       titleB.textContent = 'Magnitude vs. Depth';
     }
 
-    // density overlay
+    // density overlay (unchanged)
     const on = document.getElementById('togglePlates').checked;
     if (on && plateBase.length) drawPlateDensity(plateBase);
     else clearPlateMask();
@@ -324,9 +361,18 @@
   }
 
   // Sync: slider controls the maximum year
-  yearRange.addEventListener('input', () => {
+   yearRange.addEventListener('input', () => {
     yearMaxInp.value = String(yearRange.value);
     clampYears();
+
+    // ⇨ Only update baseYearRange when there is no time filter from the line chart
+    if (pickedYears.size === 0) {
+      baseYearRange = {
+        min: +yearMinInp.value,
+        max: +yearMaxInp.value
+      };
+    }
+
     render();
   });
 
@@ -337,8 +383,16 @@
     const max = Math.floor(+yearMaxInp.value);
     if (!Number.isNaN(min)) yearMinInp.value = String(min);
     if (!Number.isNaN(max)) yearMaxInp.value = String(max);
-    clampYears();
+        clampYears();
     yearRange.value = yearMaxInp.value;
+
+    if (pickedYears.size === 0) {
+      baseYearRange = {
+        min: +yearMinInp.value,
+        max: +yearMaxInp.value
+      };
+    }
+
     render();
   }
 
@@ -376,100 +430,163 @@
   }
 
   // Histogram of magnitudes
-  // Histogram of magnitudes
-function renderMagnitudeHistogram(allMags, breaks, colorScale){
-  const w = 260, h = 130, m = {t:16, r:12, b:26, l:34};
-  const svgH = d3.select('#hist').attr('width', w).attr('height', h);
-  svgH.selectAll('*').remove();
+  function renderMagnitudeHistogram(allMags, breaks, colorScale){
+    const w = 260, h = 130, m = {t:16, r:12, b:26, l:34};
+    const svgH = d3.select('#hist').attr('width', w).attr('height', h);
+    svgH.selectAll('*').remove();
 
-  if (!allMags || allMags.length === 0){
+    if (!allMags || allMags.length === 0){
+      svgH.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .attr('font-size',12)
+        .text('No data');
+      return;
+    }
+
+    // X axis: use global magExtent so the range stays consistent
+    const x = d3.scaleLinear()
+      .domain(magExtent)
+      .nice()
+      .range([m.l, w - m.r]);
+
+    // Binning
+    const bins = d3.bin()
+      .domain(magExtent)
+      .thresholds(20)(allMags);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(bins, b => b.length)]).nice()
+      .range([h - m.b, m.t]);
+
+    const barPad    = 0.25;  // Gap ratio for regular bars
+    const firstPad  = 0.10;  // Smaller gap for the first bar so it looks wider
+    const leftGapPx = 4;     // Shift all bars slightly to the right
+
+    const gBars = svgH.append('g');
+
+    gBars.selectAll('rect')
+      .data(bins)
+      .join('rect')
+      .attr('x', (d, i) => {
+        const x0 = x(d.x0);
+        const x1 = x(d.x1);
+        const bw = x1 - x0;
+        const pad = (i === 0) ? firstPad : barPad;
+        return x0 + bw * pad / 2 + leftGapPx;
+      })
+      .attr('y', d => y(d.length))
+      .attr('width', (d, i) => {
+        const x0 = x(d.x0);
+        const x1 = x(d.x1);
+        const bw = x1 - x0;
+        const pad = (i === 0) ? firstPad : barPad;
+        return Math.max(0, bw * (1 - pad));
+      })
+      .attr('height', d => y(0) - y(d.length))
+      .attr('fill', (d, i) =>
+        i === 0
+          ? '#fdd49e'
+          : colorScale((d.x0 + d.x1) / 2)
+      )
+      .attr('stroke', '#e6e6e6');
+
+    // X axis (magnitude)
+    svgH.append('g')
+      .attr('transform', `translate(0,${h - m.b})`)
+      .call(d3.axisBottom(x).ticks(5))
+      .selectAll('text')
+      .style('font-size','10px');
+
+    // Y axis (counts)
+    svgH.append('g')
+      .attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(4))
+      .selectAll('text')
+      .style('font-size','10px');
+
+    // Title
     svgH.append('text')
-      .attr('x', w/2)
-      .attr('y', h/2)
-      .attr('text-anchor','middle')
-      .attr('fill','#888')
+      .attr('x', m.l)
+      .attr('y', m.t - 6)
+      .attr('fill','#444')
+      .attr('font-weight',600)
       .attr('font-size',12)
-      .text('No data');
+      .text('Magnitude distribution');
+  }
+
+    // ⇨ When a year is clicked in the line chart, update yearMin / yearMax / slider and pickedYears
+function toggleYearFromLine(year) {
+  year = +year;
+
+  // ✅ 1. If two different years are already selected and a third different year is clicked, ignore it
+  //    - Allowed cases: clicking an already selected year (to unselect), or when fewer than 2 years are selected
+  if (!pickedYears.has(year) && pickedYears.size >= 2) {
     return;
   }
 
-  // X axis: use global magExtent so the range stays consistent
-  const x = d3.scaleLinear()
-    .domain(magExtent)
-    .nice()
-    .range([m.l, w - m.r]);
+  // 2) If no year was previously selected, this is the first time the line chart is used as a time filter
+  if (pickedYears.size === 0) {
+    // Save the current input/slider range for restoration upon clearing
+    baseYearRange = {
+      min: +yearMinInp.value,
+      max: +yearMaxInp.value
+    };
+  }
 
-  // Binning
-  const bins = d3.bin()
-    .domain(magExtent)
-    .thresholds(20)(allMags);
+  // 3) Toggle this year
+  if (pickedYears.has(year)) {
+    pickedYears.delete(year);
+  } else {
+    pickedYears.add(year);
+  }
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(bins, b => b.length)]).nice()
-    .range([h - m.b, m.t]);
+  // 4) Update yearMin / yearMax / slider based on pickedYears
+  if (pickedYears.size === 0) {
+    // ➜ All years cleared: return to the state without a line-chart-based time filter
+    const restoreMin = baseYearRange ? baseYearRange.min : startY;
+    const restoreMax = baseYearRange ? baseYearRange.max : yearMaxData;
 
-  const barPad    = 0.25;  // Gap ratio for regular bars
-  const firstPad  = 0.10;  // Smaller gap for the first bar so it looks wider
-  const leftGapPx = 4;     // Shift all bars slightly to the right
+    yearMinInp.value = restoreMin;
+    yearMaxInp.value = restoreMax;
+    yearRange.value  = restoreMax;
+    yearBadge.textContent = `${restoreMin} – ${restoreMax}`;
+    baseYearRange = null; // Clear backup
+  } else {
+    // ➜ Still have selected years: use min / max as the current time range
+    const arr = Array.from(pickedYears);
+    const minY = d3.min(arr);
+    const maxY = d3.max(arr);
 
-  const gBars = svgH.append('g');
+    yearMinInp.value = minY;
+    yearMaxInp.value = maxY;
+    yearRange.value  = maxY;
+    yearBadge.textContent = `${minY} – ${maxY}`;
+  }
 
-  gBars.selectAll('rect')
-    .data(bins)
-    .join('rect')
-    .attr('x', (d, i) => {
-      const x0 = x(d.x0);
-      const x1 = x(d.x1);
-      const bw = x1 - x0;
-      const pad = (i === 0) ? firstPad : barPad;
-      return x0 + bw * pad / 2 + leftGapPx;
-    })
-    .attr('y', d => y(d.length))
-    .attr('width', (d, i) => {
-      const x0 = x(d.x0);
-      const x1 = x(d.x1);
-      const bw = x1 - x0;
-      const pad = (i === 0) ? firstPad : barPad;
-      return Math.max(0, bw * (1 - pad));
-    })
-    .attr('height', d => y(0) - y(d.length))
-    .attr('fill', (d, i) =>
-      i === 0
-        ? '#fdd49e' // First bar: slightly darker than the original light orange, still lighter than the second and third bands
-        : colorScale((d.x0 + d.x1) / 2)
-    )
-    .attr('stroke', '#e6e6e6');
-
-  // X axis (magnitude)
-  svgH.append('g')
-    .attr('transform', `translate(0,${h - m.b})`)
-    .call(d3.axisBottom(x).ticks(5))
-    .selectAll('text')
-    .style('font-size','10px');
-
-  // Y axis (counts)
-  svgH.append('g')
-    .attr('transform', `translate(${m.l},0)`)
-    .call(d3.axisLeft(y).ticks(4))
-    .selectAll('text')
-    .style('font-size','10px');
-
-  // Title
-  svgH.append('text')
-    .attr('x', m.l)
-    .attr('y', m.t - 6)
-    .attr('fill','#444')
-    .attr('font-weight',600)
-    .attr('font-size',12)
-    .text('Magnitude distribution');
+  // 5) Re-render all views (map, line chart, etc.)
+  render();
 }
-  // Side line chart: event counts per year
-  function renderCountLine(rows){
+
+  // Side line chart: event counts per year (single-type version)
+  function renderCountLine(rows, typeForColor){
     const svg = d3.select('#countLine');
     svg.selectAll('*').remove();
     const w = svg.node().clientWidth  || 320;
     const h = svg.node().clientHeight || 220;
     const m = {t:16, r:10, b:28, l:36};
+
+    if (!rows || rows.length === 0){
+      svg.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .text('No data');
+      return;
+    }
 
     const x = d3.scaleLinear()
       .domain(d3.extent(rows, d => d.year) || [startY,startY]).nice()
@@ -489,35 +606,132 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
       .attr('transform', `translate(${m.l},0)`)
       .call(d3.axisLeft(y).ticks(5));
 
-    const line = d3.line()
-      .x(d => x(d.year))
-      .y(d => y(d.count));
+    const strokeColor = typeForColor && typeColor.domain().includes(typeForColor)
+      ? typeColor(typeForColor)
+      : '#2c7fb8';
 
-    g.append('path')
-      .datum(rows)
-      .attr('fill','none')
-      .attr('stroke','#2c7fb8')
-      .attr('stroke-width',1.8)
-      .attr('d', line);
+    // Line: only meaningful when there are at least 2 years
+    if (rows.length > 1){
+      const line = d3.line()
+        .defined(d => Number.isFinite(d.year) && Number.isFinite(d.count))
+        .x(d => x(d.year))
+        .y(d => y(d.count));
+
+      g.append('path')
+        .datum(rows)
+        .attr('fill','none')
+        .attr('stroke', strokeColor)
+        .attr('stroke-width',1.8)
+        .attr('d', line);
+    }
+
+    // Points: always draw one point per year with its event count
+      g.append('g').selectAll('circle')
+    .data(rows)
+    .join('circle')
+    .attr('cx', d => x(d.year))
+    .attr('cy', d => y(d.count))
+    .attr('r', d => pickedYears.has(d.year) ? 6 : 3)   // ⇨ 被選年份點變大
+    .attr('fill', strokeColor)
+    .attr('stroke', '#fff')
+    .attr('stroke-width', d => pickedYears.has(d.year) ? 2 : 1)
+    .style('cursor', 'pointer')
+    .on('mousemove', (ev, d) => {
+      tooltip
+        .style('opacity', 1)
+        .style('left', (ev.pageX + 12) + 'px')
+        .style('top', (ev.pageY + 12) + 'px')
+        .html(
+          `<div><strong>${typeForColor || 'All types'}</strong></div>` +
+          `<div>Year: ${d.year}</div>` +
+          `<div>Event count: ${d.count}</div>`
+        );
+    })
+    .on('mouseleave', () => {
+      tooltip.style('opacity', 0);
+    })
+    .on('click', (ev, d) => {
+      // ⇨ Clicking this year starts or updates the time filter
+      toggleYearFromLine(d.year);
+    });
+        // --- Legend for single-type line chart ---
+    const legend = g.append('g')
+      .attr('class', 'line-legend')
+      // 跟 multi-type 一樣放在右上角，只是稍微靠上一點
+      .attr('transform', `translate(${w - m.r - 110},${m.t - 10})`);
+
+    const label = typeForColor || 'All types';
+    const legendColor = typeForColor && typeColor.domain().includes(typeForColor)
+      ? typeColor(typeForColor)
+      : strokeColor;
+
+    const item = legend.append('g')
+      .attr('class', 'legend-item');
+
+    item.append('rect')
+      .attr('x', 0)
+      .attr('y', -10)
+      .attr('width', 12)
+      .attr('height', 12)
+      .attr('fill', legendColor)
+      .attr('stroke', '#333')
+      .attr('stroke-width', 0.5);
+
+    item.append('text')
+      .attr('x', 18)
+      .attr('y', 0)
+      .attr('alignment-baseline', 'middle')
+      .attr('fill', '#444')
+      .style('font-size', '11px')
+      .text(label);
   }
 
-  // Side line chart: average magnitude per year
-  function renderAvgMagLine(rows){
-    const svg = d3.select('#avgMagLine');
+  // Multi-type line chart: counts per year for each type
+  function renderCountLineAllTypes(rows){
+    const svg = d3.select('#countLine');
     svg.selectAll('*').remove();
     const w = svg.node().clientWidth  || 320;
     const h = svg.node().clientHeight || 220;
     const m = {t:16, r:10, b:28, l:36};
 
+    // rows are raw events (including type and year)
+    const roll = d3.rollup(
+      rows,
+      v => v.length,      // 每年事件數
+      d => d.type,
+      d => d.year
+    );
+
+    const series = Array.from(
+      roll,
+      ([type, yearMap]) => ({
+        type,
+        values: Array.from(
+          yearMap,
+          ([year, count]) => ({ year: +year, count })
+        ).sort((a, b) => a.year - b.year)
+      })
+    ).sort((a, b) => typeSet.indexOf(a.type) - typeSet.indexOf(b.type));
+
+    const allPoints = series.flatMap(s => s.values);
+    if (!allPoints.length){
+      svg.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .text('No data');
+      return;
+    }
+
     const x = d3.scaleLinear()
-      .domain(d3.extent(rows, d => d.year) || [startY,startY]).nice()
+      .domain(d3.extent(allPoints, d => d.year) || [startY,startY])
+      .nice()
       .range([m.l, w - m.r]);
 
     const y = d3.scaleLinear()
-      .domain([
-        d3.min(rows, d => d.avgMag) || 5,
-        d3.max(rows, d => d.avgMag) || 6
-      ]).nice()
+      .domain([0, d3.max(allPoints, d => d.count) || 1])
+      .nice()
       .range([h - m.b, m.t]);
 
     const g = svg.append('g');
@@ -532,14 +746,186 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
 
     const line = d3.line()
       .x(d => x(d.year))
-      .y(d => y(d.avgMag));
+      .y(d => y(d.count));
 
-    g.append('path')
-      .datum(rows)
+    const seriesG = g.append('g')
+      .selectAll('g.series')
+      .data(series)
+      .join('g')
+      .attr('class','series');
+
+    // Lines
+    seriesG.append('path')
       .attr('fill','none')
-      .attr('stroke','#d95f0e')
+      .attr('stroke', d => typeColor(d.type))
       .attr('stroke-width',1.8)
-      .attr('d', line);
+      .attr('opacity',0.9)
+      .attr('d', d => line(d.values));
+
+    // Points
+    seriesG.append('g')
+      .selectAll('circle')
+      .data(d => d.values.map(v => ({ ...v, type: d.type })))
+      .join('circle')
+      .attr('cx', d => x(d.year))
+      .attr('cy', d => y(d.count))
+      .attr('r', d => pickedYears.has(d.year) ? 6 : 3)       // ⇨ 被選年份變大
+      .attr('fill', d => typeColor(d.type))
+      .attr('stroke','#fff')
+      .attr('stroke-width', d => pickedYears.has(d.year) ? 2 : 1)
+      .attr('opacity',0.9)
+      .style('cursor','pointer')
+      .on('mousemove', (ev, d) => {
+        tooltip
+          .style('opacity', 1)
+          .style('left', (ev.pageX + 12) + 'px')
+          .style('top', (ev.pageY + 12) + 'px')
+          .html(
+            `<div><strong>${d.type}</strong></div>` +
+            `<div>Year: ${d.year}</div>` +
+            `<div>Event count: ${d.count}</div>`
+          );
+      })
+      .on('mouseleave', () => {
+        tooltip.style('opacity', 0);
+      })
+      .on('click', (ev, d) => {
+        // ⇨ Use the same logic to toggle the selected year
+        toggleYearFromLine(d.year);
+      });
+
+    // --- Legend for multi-type line chart ---
+    const legend = g.append('g')
+      .attr('class', 'line-legend')
+      // place legend near the upper-right corner of the inner plotting area
+      .attr('transform', `translate(${w - m.r - 110},${m.t - 10})`);
+
+    const legendItems = series.map(s => s.type);
+
+    legend.selectAll('g.legend-item')
+      .data(legendItems)
+      .join('g')
+      .attr('class', 'legend-item')
+      .attr('transform', (d,i) => `translate(0, ${i * 18})`)
+      .each(function(d){
+        const item = d3.select(this);
+        item.append('rect')
+          .attr('x', 0)
+          .attr('y', -10)
+          .attr('width', 12)
+          .attr('height', 12)
+          .attr('fill', typeColor(d))
+          .attr('stroke', '#333')
+          .attr('stroke-width', 0.5);
+
+        item.append('text')
+          .attr('x', 18)
+          .attr('y', 0)
+          .attr('alignment-baseline', 'middle')
+          .attr('fill', '#444')
+          .style('font-size', '11px')
+          .text(d);
+      });
+  }
+
+  // Bottom panel (line mode): average magnitude by type (barchart)
+  function renderTypeBar(rows){
+    const svg = d3.select('#avgMagLine');
+    svg.selectAll('*').remove();
+
+    const w = svg.node().clientWidth  || 320;
+    const h = svg.node().clientHeight || 220;
+    const m = {t:16, r:10, b:32, l:44};
+
+    // Aggregate by type: average magnitude + count
+    const aggregated = Array.from(
+      d3.rollup(
+        rows,
+        v => ({
+          avgMag: d3.mean(v, d => d.mag),
+          count: v.length
+        }),
+        d => d.type
+      ),
+      ([type, v]) => ({ type, avgMag: v.avgMag, count: v.count })
+    ).sort((a,b) => typeSet.indexOf(a.type) - typeSet.indexOf(b.type));
+
+    if (aggregated.length === 0){
+      svg.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .text('No data');
+      return;
+    }
+
+    const x = d3.scaleBand()
+      .domain(aggregated.map(d => d.type))
+      .range([m.l, w - m.r])
+      .padding(0.25);
+
+    // Fix y-axis range to 0–7
+    const y = d3.scaleLinear()
+      .domain([0, 7])
+      .nice()
+      .range([h - m.b, m.t]);
+
+    const g = svg.append('g');
+
+    g.append('g')
+      .attr('transform', `translate(0,${h - m.b})`)
+      .call(d3.axisBottom(x))
+      .selectAll('text')
+      .style('font-size', '10px')
+      .attr('text-anchor', 'middle')   // 水平置中
+      .attr('transform', null);        // 取消旋轉
+
+    g.append('g')
+      .attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(5));
+
+    g.append('g').selectAll('rect')
+      .data(aggregated, d => d.type)
+      .join('rect')
+      .attr('x', d => x(d.type))
+      .attr('width', x.bandwidth())
+      .attr('y', d => y(d.avgMag))
+      .attr('height', d => y(0) - y(d.avgMag))
+      .attr('fill', d => typeColor(d.type))
+      .attr('opacity', d => !selectedType || selectedType === d.type ? 1 : 0.35)
+      .attr('stroke', d => selectedType === d.type ? '#333' : 'none')
+      .attr('stroke-width', d => selectedType === d.type ? 1.5 : 0)
+      .style('cursor','pointer')
+      .on('mousemove', (ev, d) => {
+        tooltip
+          .style('opacity', 1)
+          .style('left', (ev.pageX + 12) + 'px')
+          .style('top', (ev.pageY + 12) + 'px')
+          .html(
+            `<div><strong>${d.type}</strong></div>` +
+            `<div>Average magnitude: ${d.avgMag.toFixed(2)}</div>` +
+            `<div>Count: ${d.count}</div>`
+          );
+      })
+      .on('mouseleave', () => {
+        tooltip.style('opacity', 0);
+      })
+      .on('click', (ev, d) => {
+        // Toggle selection
+        selectedType = (selectedType === d.type) ? null : d.type;
+        render();
+      });
+
+    // Y axis label
+    g.append('text')
+      .attr('transform','rotate(-90)')
+      .attr('x', -(h/2))
+      .attr('y', 14)
+      .attr('text-anchor','middle')
+      .attr('fill','#666')
+      .attr('font-size',10)
+      .text('Average magnitude');
   }
 
   // Plate density (contour) overlay

@@ -1,95 +1,113 @@
 
+# Seismic Analysis — Interactive Earthquake Visualization (D3.js)
 
-# Seismic Analysis — Earthquake Visualization with D3.js
+This project is an interactive visualization of global earthquake activity (1900–2016) built with **D3.js v7**. It provides intuitive tools to explore earthquakes across **time**, **location**, **magnitude**, **depth**, and **event types**, supported by interactive filtering and dynamic visual encodings.
 
-This project is an interactive visualization of global earthquake activity from 1900–2016, built using D3.js v7. It allows users to explore seismic patterns across space, time, magnitude, depth, and tectonic structure through a set of dynamic, interactive components.
+---
 
-The visualization aims to make earthquake patterns intuitive, interactive, and scientifically meaningful, while providing a flexible tool for exploring large-scale seismic datasets.
+## 🔍 Key Features
 
-## Features Overview
+### **1. Global Earthquake Map**
+- Earthquakes plotted by geographic coordinates.
+- Circle radius encodes magnitude; color encodes quantile-based magnitude bins.
+- Zoom and pan supported.
+- Tooltip provides magnitude, depth, location, year, and event type.
+- The map dynamically updates when:
+  - Time range changes  
+  - Event type filters change  
+  - User selects years in the line chart  
 
-### 1. Global Earthquake Map
-- Earthquakes displayed using geographic coordinates.
-- Circle size encodes magnitude; color encodes quantile-based magnitude bins.
-- Zoom and pan interactions.
-- Tooltip showing magnitude, depth, coordinates, date, and event type.
+---
 
-### 2. Density Overlay
-A toggleable density layer generated using contour density estimation, highlighting:
-- High-density seismic zones
-- Plate tectonic structures
-- Subduction boundaries
+### **2. Interactive Time Range Control**
+- Synchronized numeric inputs and slider.
+- Default view loads **full range (1965–2016)**.
+- Line-chart year markers are clickable:
+  - Clicking one year filters the map to that year.
+  - Clicking two years selects a year interval.
+  - Clicking a selected point again cancels it.
 
-### 3. Magnitude Distribution Histogram
-A histogram that updates with filters:
-- Uses quantile-based color mapping
-- Includes refined spacing to improve readability
+---
 
-### 4. Side Panel — Line Mode
-Two line charts for temporal trends:
-1. Trends of Earthquake Events  
-2. Trends of Average Magnitude
+### **3. Event Type Filters**
+Users may toggle the visibility of:
+- Earthquake  
+- Explosion  
+- Nuclear Explosion  
+- Rock Burst  
 
-### 5. Side Panel — Scatter Mode
-Scatterplots that replace the line charts on toggle:
-- Magnitude vs. Horizontal Distance  
-- Magnitude vs. Depth  
+All views (map, histogram, line chart, bar chart, scatter plots) update accordingly.
 
-### 6. Interactive Time Filter
-Includes numeric inputs and a synchronized slider.  
-Enables analysis of historical ranges, decades, or short periods.
+---
 
-### 7. Earthquake Type Filters
-Users can toggle visibility for:
-- Earthquake
-- Explosion
-- Nuclear Explosion
-- Rock Burst
+### **4. Magnitude Distribution Histogram**
+- Uses global magnitude extent for consistent axes.
+- Bins magnitude into 20 intervals.
+- Color follows quantile thresholds.
+- Auto-updates based on active filters.
 
-## Design Evolution
+---
 
-### Initial Concepts
-Early designs used raw scatterplots without geographic context. While technically correct, the lack of a basemap made the patterns difficult to interpret.
+### **5. Trends Line Chart (Updated)**
+- When **no event type is selected**, the chart displays **multiple lines**, one per type, each using consistent color coding.
+- When a **specific type is selected**, only its trend line is shown.
+- Each year is represented by a point, which can be clicked to filter the map.
+- A dynamic legend is generated based on currently displayed event types.
 
-### Adding the Basemap
-Introducing a world map transformed the interpretability of the scatterplots. Patterns such as the Pacific Ring of Fire became immediately clear.
+---
 
-### Incorporating Plate Boundaries
-Overlaying tectonic boundaries highlighted the strong alignment between earthquakes and plate structures. Adjustments were made to balance visual clarity and avoid clutter.
+### **6. Average Magnitude Bar Chart (Updated)**
+- Displays average magnitude for each event type within the active time range.
+- Bar colors match the type-filter color scheme.
+- Labels are horizontal for improved readability.
+- Clicking a bar:
+  - Filters the entire visualization to that event type.
+  - Clicking again resets to all types.
 
-### Interactivity Enhancements
-To address density and clutter, the following were introduced:
-- Year filtering
-- Magnitude and type filtering
-- Dynamic panels and tooltips
+---
 
-These additions shifted the visualization from static to fully interactive.
+### **7. Scatter Plot Mode (Updated)**
+Two scatterplots are available:
+- **Magnitude vs. Horizontal Distance**
+- **Magnitude vs. Depth**
 
-### Final Additions
-The final version includes:
-- Density overlays
-- Magnitude histograms
-- Flexible side panel modes
-- Improved filtering and tooltips
+Updates include:
+- Scatter points now use event-type color mapping.
+- When switching to scatter mode, the time range resets to the full range for clarity.
 
-## Evaluation
+---
 
-### Strengths
-- Effectively communicates spatial relationships between earthquakes and tectonic plates.
-- Filtering tools reveal temporal and magnitude-based patterns.
-- Scatterplots help explain relationships between depth, magnitude, and horizontal distance.
+### **8. Density Overlay**
+Optional tectonic-density visualization using contour density estimation:
+- Highlights plate boundaries and high-density clusters.
+- Toggle switch provided.
 
-### Areas for Improvement
-- Map becomes crowded when all data points are shown at once.
-- Possible additions:
-  - Data clustering or aggregation
-  - Animated playback of earthquake events over time
-  - Integration with real-time USGS data
-  - Annotated plate regions or seismic hotspots
+---
 
-Overall, the project successfully visualizes seismic patterns in an accessible and interactive manner.
+## 🧭 Design Improvements (Final Revision)
+- Side panels not essential to core interaction are visually hidden for a cleaner layout.
+- Centered layout for main chart area.
+- Added legend for the trends line chart.
+- Improved axis readability and spacing.
+- Unified interaction patterns (click toggles, highlighting, interval filtering).
 
-## Setup and Installation
+---
+
+## 🗂 Project Structure
+
+```
+Seismic Analysis/
+│── index.html
+│── style.css            # Updated styling, centered layout, panel hiding
+│── script.js            # Enhanced filtering, legend, multi-line trends, scatter logic
+│── database.csv
+│── all.csv
+│── README.md
+```
+
+---
+
+## 📦 Setup
 
 Clone the repository:
 
@@ -98,32 +116,21 @@ git clone https://github.com/YOUR_USERNAME/seismic-analysis.git
 cd seismic-analysis
 ```
 
-Start a local server (required for CSV loading):
+Start a local server (CSV loading requires HTTP):
 
 ```
 python3 -m http.server
 ```
 
-Then open:
+Open:
 
 ```
 http://localhost:8000/
 ```
 
-## Project Structure
+---
 
-```
-Seismic Analysis/
-│── index.html
-│── style.css
-│── script.js
-│── database.csv
-│── all.csv
-│── README.md
-```
-
-## Contributors
-
-- Yu-Chun Lai
-- Sanjeev Sharma
-- Connor McGrath
+## 👥 Contributors
+- Yu-Chun Lai  
+- Sanjeev Sharma  
+- Connor McGrath  

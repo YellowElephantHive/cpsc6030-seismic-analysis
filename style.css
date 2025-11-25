@@ -2,8 +2,9 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,sans-serif;color:#222}
-header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.2) blur(6px);padding:10px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:16px}
+header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:saturate(1.2) blur(6px);padding:10px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:16px;justify-content:center}
 h1{font-size:18px;margin:0;font-weight:600}
+header .left-spacer, header .right-spacer { flex:1; }
 .panel{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .control{display:flex;align-items:center;gap:8px}
 .control label{font-size:13px;color:#555;white-space:nowrap}
@@ -62,4 +63,47 @@ input:checked + .slider:before{transform:translateX(22px)}
   svg.sideplot{height:180px}
   .legend{font-size:11px}
   .control label{font-size:12px}
+}
+
+
+/* Hide Type filter row (Earthquake / Explosion / Nuclear / etc.)*/
+#typeFilters,
+label[for="typeFilters"],
+#typeFilters ~ label {
+  display: none !important;
+}
+
+/* Hide the "Type" label text (regardless of whether it's a label or a span)*/
+#topControls label:nth-child(5),
+#topControls span:nth-child(5) {
+  display: none !important;
+}
+
+/* Hide the year left/right inputs (only keep slider + badge)*/
+#yearMin,
+#yearMax {
+  display: none !important;
+}
+
+/* Hide the "Year" label text*/
+label[for="yearMin"],
+label[for="yearRange"] {
+  display: none !important;
+}
+
+/*  Position the badge closer to the slider to look like one unified control*/
+#yearBadge {
+  margin-left: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/*  Adjust slider appearance (currently fully hidden)*/
+#yearRange {
+  display: none !important;
+}
+
+/*  Hide the 'Year' text label without affecting other labels*/
+header .control:first-of-type label {
+  display: none !important;
 }
