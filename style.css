@@ -13,7 +13,7 @@ header .left-spacer, header .right-spacer { flex:1; }
 #mapWrap{position:relative;min-width:0}
 #map{width:100%;height:calc(100vh - var(--header-h) - 24px);display:block;background:#fff}
 
-.tooltip{position:absolute;pointer-events:none;background:rgba(255,255,255,0.95);border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.tooltip{position:absolute;pointer-events:none;background:rgba(255,255,255,0.95);border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.08);z-index: 9999;}
 
 .topleft{position:absolute;left:16px;top:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;z-index:10;pointer-events:none}
 #hist{background:rgba(255,255,255,.9);border:1px solid #eee;border-radius:10px}

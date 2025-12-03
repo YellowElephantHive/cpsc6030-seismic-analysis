@@ -28,7 +28,9 @@
     Number.isFinite(d.lat)  &&
     Number.isFinite(d.lon)  &&
     Number.isFinite(d.mag)  &&
-    Number.isFinite(d.year)
+    Number.isFinite(d.year) &&
+    d.type !== 'Rock Burst' &&
+    d.type !== 'Rock Blast'
   );
 
   // side panel mode: 'line' (default) or 'scatter'
