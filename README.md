@@ -1,4 +1,3 @@
-
 # Seismic Analysis — Interactive Earthquake Visualization (D3.js)
 
 This project is an interactive visualization of global earthquake activity (1900–2016) built with **D3.js v7**. It provides intuitive tools to explore earthquakes across **time**, **location**, **magnitude**, **depth**, and **event types**, supported by interactive filtering and dynamic visual encodings.
@@ -45,6 +44,7 @@ All views (map, histogram, line chart, bar chart, scatter plots) update accordin
 - Bins magnitude into 20 intervals.
 - Color follows quantile thresholds.
 - Auto-updates based on active filters.
+- Each bar is independently selectable; clicking a bar filters the map to earthquakes whose magnitudes fall within that bar’s range.
 
 ---
 
@@ -53,6 +53,7 @@ All views (map, histogram, line chart, bar chart, scatter plots) update accordin
 - When a **specific type is selected**, only its trend line is shown.
 - Each year is represented by a point, which can be clicked to filter the map.
 - A dynamic legend is generated based on currently displayed event types.
+- Selected years now display vertical guide lines; selecting two years shows an interval with dimmed out-of-range regions.
 
 ---
 
@@ -60,9 +61,8 @@ All views (map, histogram, line chart, bar chart, scatter plots) update accordin
 - Displays average magnitude for each event type within the active time range.
 - Bar colors match the type-filter color scheme.
 - Labels are horizontal for improved readability.
-- Clicking a bar:
-  - Filters the entire visualization to that event type.
-  - Clicking again resets to all types.
+- Previously used for event‑type filtering, now functions only as a descriptive summary.
+- No longer triggers filtering of the map.
 
 ---
 
@@ -74,6 +74,7 @@ Two scatterplots are available:
 Updates include:
 - Scatter points now use event-type color mapping.
 - When switching to scatter mode, the time range resets to the full range for clarity.
+- Magnitude filtering from histogram selection also applies in scatter mode.
 
 ---
 
@@ -85,11 +86,15 @@ Optional tectonic-density visualization using contour density estimation:
 ---
 
 ## 🧭 Design Improvements (Final Revision)
-- Side panels not essential to core interaction are visually hidden for a cleaner layout.
-- Centered layout for main chart area.
-- Added legend for the trends line chart.
-- Improved axis readability and spacing.
-- Unified interaction patterns (click toggles, highlighting, interval filtering).
+- Replaced the event-type bar chart with a magnitude-distribution histogram in the side panel.
+- Swapped the histogram and average-magnitude bar chart positions for better visual hierarchy.
+- Added vertical selection markers to the line chart (one or two red guide lines) when users click year points.
+- Added dimming of out-of-range years when interval selection is active.
+- Enabled per‑bar magnitude filtering: clicking any bar in the histogram filters map earthquakes to that bin.
+- Histogram bars now highlight individually (not by quantile group), with non-selected bars dimmed.
+- Histogram filtering is now aligned with quantile-based coloring so only correctly colored points appear on the map.
+- Map updates now prioritize magnitude selection over event type.
+- Magnitude legend repositioned inside the histogram card.
 
 ---
 
