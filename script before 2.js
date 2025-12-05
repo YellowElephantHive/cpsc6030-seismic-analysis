@@ -263,7 +263,7 @@
       titleA.textContent = selectedType
         ? `Trends of ${selectedType} Events`
         : 'Trends of Events by Type';
-      titleB.textContent = 'Magnitude distribution';
+      titleB.textContent = 'Average magnitude by type';
     }else{
       titleA.textContent = 'Magnitude vs. Horizontal Distance';
       titleB.textContent = 'Magnitude vs. Depth';
@@ -433,95 +433,91 @@
 
   // Histogram of magnitudes
   function renderMagnitudeHistogram(allMags, breaks, colorScale){
-  const svgH = d3.select('#hist');
-  svgH.selectAll('*').remove();
+    const w = 260, h = 130, m = {t:16, r:12, b:26, l:34};
+    const svgH = d3.select('#hist').attr('width', w).attr('height', h);
+    svgH.selectAll('*').remove();
 
-  // ✅ 用實際的 SVG 大小，而不是固定 260×130
-  const w = svgH.node().clientWidth  || 320;
-  const h = svgH.node().clientHeight || 220;
-  const m = { t:16, r:12, b:26, l:34 };
+    if (!allMags || allMags.length === 0){
+      svgH.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .attr('font-size',12)
+        .text('No data');
+      return;
+    }
 
-  if (!allMags || allMags.length === 0){
+    // X axis: use global magExtent so the range stays consistent
+    const x = d3.scaleLinear()
+      .domain(magExtent)
+      .nice()
+      .range([m.l, w - m.r]);
+
+    // Binning
+    const bins = d3.bin()
+      .domain(magExtent)
+      .thresholds(20)(allMags);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(bins, b => b.length)]).nice()
+      .range([h - m.b, m.t]);
+
+    const barPad    = 0.25;  // Gap ratio for regular bars
+    const firstPad  = 0.10;  // Smaller gap for the first bar so it looks wider
+    const leftGapPx = 4;     // Shift all bars slightly to the right
+
+    const gBars = svgH.append('g');
+
+    gBars.selectAll('rect')
+      .data(bins)
+      .join('rect')
+      .attr('x', (d, i) => {
+        const x0 = x(d.x0);
+        const x1 = x(d.x1);
+        const bw = x1 - x0;
+        const pad = (i === 0) ? firstPad : barPad;
+        return x0 + bw * pad / 2 + leftGapPx;
+      })
+      .attr('y', d => y(d.length))
+      .attr('width', (d, i) => {
+        const x0 = x(d.x0);
+        const x1 = x(d.x1);
+        const bw = x1 - x0;
+        const pad = (i === 0) ? firstPad : barPad;
+        return Math.max(0, bw * (1 - pad));
+      })
+      .attr('height', d => y(0) - y(d.length))
+      .attr('fill', (d, i) =>
+        i === 0
+          ? '#fdd49e'
+          : colorScale((d.x0 + d.x1) / 2)
+      )
+      .attr('stroke', '#e6e6e6');
+
+    // X axis (magnitude)
+    svgH.append('g')
+      .attr('transform', `translate(0,${h - m.b})`)
+      .call(d3.axisBottom(x).ticks(5))
+      .selectAll('text')
+      .style('font-size','10px');
+
+    // Y axis (counts)
+    svgH.append('g')
+      .attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(4))
+      .selectAll('text')
+      .style('font-size','10px');
+
+    // Title
     svgH.append('text')
-      .attr('x', w/2)
-      .attr('y', h/2)
-      .attr('text-anchor','middle')
-      .attr('fill','#888')
+      .attr('x', m.l)
+      .attr('y', m.t - 6)
+      .attr('fill','#444')
+      .attr('font-weight',600)
       .attr('font-size',12)
-      .text('No data');
-    return;
+      .text('Magnitude distribution');
   }
-
-  // X axis: use global magExtent so the range stays consistent
-  const x = d3.scaleLinear()
-    .domain(magExtent)
-    .nice()
-    .range([m.l, w - m.r]);
-
-  // Binning
-  const bins = d3.bin()
-    .domain(magExtent)
-    .thresholds(20)(allMags);
-
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(bins, b => b.length)]).nice()
-    .range([h - m.b, m.t]);
-
-  const barPad    = 0.25;  // Gap ratio for regular bars
-  const firstPad  = 0.10;  // Smaller gap for the first bar so it looks wider
-  const leftGapPx = 4;     // Shift all bars slightly to the right
-
-  const gBars = svgH.append('g');
-
-  gBars.selectAll('rect')
-    .data(bins)
-    .join('rect')
-    .attr('x', (d, i) => {
-      const x0 = x(d.x0);
-      const x1 = x(d.x1);
-      const bw = x1 - x0;
-      const pad = (i === 0) ? firstPad : barPad;
-      return x0 + bw * pad / 2 + leftGapPx;
-    })
-    .attr('y', d => y(d.length))
-    .attr('width', (d, i) => {
-      const x0 = x(d.x0);
-      const x1 = x(d.x1);
-      const bw = x1 - x0;
-      const pad = (i === 0) ? firstPad : barPad;
-      return Math.max(0, bw * (1 - pad));
-    })
-    .attr('height', d => y(0) - y(d.length))
-    .attr('fill', (d, i) =>
-      i === 0
-        ? '#fdd49e'
-        : colorScale((d.x0 + d.x1) / 2)
-    )
-    .attr('stroke', '#e6e6e6');
-
-  // X axis (magnitude)
-  svgH.append('g')
-    .attr('transform', `translate(0,${h - m.b})`)
-    .call(d3.axisBottom(x).ticks(5))
-    .selectAll('text')
-    .style('font-size','10px');
-
-  // Y axis (counts)
-  svgH.append('g')
-    .attr('transform', `translate(${m.l},0)`)
-    .call(d3.axisLeft(y).ticks(4))
-    .selectAll('text')
-    .style('font-size','10px');
-
-  // Title
-  //svgH.append('text')
-  //  .attr('x', m.l)
-  //  .attr('y', m.t - 6)
-  //  .attr('fill','#444')
-  //  .attr('font-weight',600)
-  //  .attr('font-size',12)
-  //  .text('Magnitude distribution');
-}
 
     // ⇨ When a year is clicked in the line chart, update yearMin / yearMax / slider and pickedYears
 function toggleYearFromLine(year) {
@@ -576,124 +572,63 @@ function toggleYearFromLine(year) {
   render();
 }
 
-// 在 toggleYearFromLine(...) 後面加這個 helper
-function drawYearSelectionOverlay(g, x, w, h, m){
-  if (pickedYears.size === 0) return;
-
-  const yearsSel = Array.from(pickedYears).sort(d3.ascending);
-  const xStart = m.l;
-  const xEnd   = w - m.r;
-  const yTop   = m.t;
-  const yBot   = h - m.b;
-
-  const layer = g.append('g')
-    .attr('class', 'year-selection-layer')
-    .style('pointer-events', 'none');
-
-  // 1) 先畫垂直紅線（1 或 2 條）
-  yearsSel.forEach(yr => {
-    const xPos = x(yr);
-    if (!Number.isFinite(xPos)) return;
-    layer.append('line')
-      .attr('x1', xPos)
-      .attr('x2', xPos)
-      .attr('y1', yTop)
-      .attr('y2', yBot)
-      .attr('stroke', '#d62728')
-      .attr('stroke-width', 1.5)
-      .attr('stroke-dasharray', '4,3');
-  });
-
-  // 2) 如果剛好選了兩個年份，區間外變暗
-  if (yearsSel.length === 2){
-    const minY = yearsSel[0];
-    const maxY = yearsSel[1];
-    const xMin = x(minY);
-    const xMax = x(maxY);
-
-    // 左側（min 年以前）
-    const leftW = xMin - xStart;
-    if (leftW > 0){
-      layer.append('rect')
-        .attr('x', xStart)
-        .attr('y', yTop)
-        .attr('width', leftW)
-        .attr('height', yBot - yTop)
-        .attr('fill', 'rgba(0,0,0,0.05)');
-    }
-
-    // 右側（max 年以後）
-    const rightW = xEnd - xMax;
-    if (rightW > 0){
-      layer.append('rect')
-        .attr('x', xMax)
-        .attr('y', yTop)
-        .attr('width', rightW)
-        .attr('height', yBot - yTop)
-        .attr('fill', 'rgba(0,0,0,0.05)');
-    }
-  }
-}
-
+  // Side line chart: event counts per year (single-type version)
   function renderCountLine(rows, typeForColor){
-  const svg = d3.select('#countLine');
-  svg.selectAll('*').remove();
-  const w = svg.node().clientWidth  || 320;
-  const h = svg.node().clientHeight || 220;
-  const m = {t:16, r:10, b:28, l:36};
+    const svg = d3.select('#countLine');
+    svg.selectAll('*').remove();
+    const w = svg.node().clientWidth  || 320;
+    const h = svg.node().clientHeight || 220;
+    const m = {t:16, r:10, b:28, l:36};
 
-  if (!rows || rows.length === 0){
-    svg.append('text')
-      .attr('x', w/2)
-      .attr('y', h/2)
-      .attr('text-anchor','middle')
-      .attr('fill','#888')
-      .text('No data');
-    return;
-  }
+    if (!rows || rows.length === 0){
+      svg.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .text('No data');
+      return;
+    }
 
-  const x = d3.scaleLinear()
-    .domain(d3.extent(rows, d => d.year) || [startY,startY]).nice()
-    .range([m.l, w - m.r]);
+    const x = d3.scaleLinear()
+      .domain(d3.extent(rows, d => d.year) || [startY,startY]).nice()
+      .range([m.l, w - m.r]);
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(rows, d => d.count) || 1]).nice()
-    .range([h - m.b, m.t]);
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(rows, d => d.count) || 1]).nice()
+      .range([h - m.b, m.t]);
 
-  const g = svg.append('g');
+    const g = svg.append('g');
 
-  g.append('g')
-    .attr('transform', `translate(0,${h - m.b})`)
-    .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format('d')));
+    g.append('g')
+      .attr('transform', `translate(0,${h - m.b})`)
+      .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format('d')));
 
-  g.append('g')
-    .attr('transform', `translate(${m.l},0)`)
-    .call(d3.axisLeft(y).ticks(5));
+    g.append('g')
+      .attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(5));
 
-  // 🔴 在這裡加上垂直線 + 區間外變暗
-  drawYearSelectionOverlay(g, x, w, h, m);
+    const strokeColor = typeForColor && typeColor.domain().includes(typeForColor)
+      ? typeColor(typeForColor)
+      : '#2c7fb8';
 
-  const strokeColor = typeForColor && typeColor.domain().includes(typeForColor)
-    ? typeColor(typeForColor)
-    : '#2c7fb8';
+    // Line: only meaningful when there are at least 2 years
+    if (rows.length > 1){
+      const line = d3.line()
+        .defined(d => Number.isFinite(d.year) && Number.isFinite(d.count))
+        .x(d => x(d.year))
+        .y(d => y(d.count));
 
-  // Line: only meaningful when there are at least 2 years
-  if (rows.length > 1){
-    const line = d3.line()
-      .defined(d => Number.isFinite(d.year) && Number.isFinite(d.count))
-      .x(d => x(d.year))
-      .y(d => y(d.count));
+      g.append('path')
+        .datum(rows)
+        .attr('fill','none')
+        .attr('stroke', strokeColor)
+        .attr('stroke-width',1.8)
+        .attr('d', line);
+    }
 
-    g.append('path')
-      .datum(rows)
-      .attr('fill','none')
-      .attr('stroke', strokeColor)
-      .attr('stroke-width',1.8)
-      .attr('d', line);
-  }
-
-  // Points: always draw one point per year with its event count
-  g.append('g').selectAll('circle')
+    // Points: always draw one point per year with its event count
+      g.append('g').selectAll('circle')
     .data(rows)
     .join('circle')
     .attr('cx', d => x(d.year))
@@ -721,180 +656,179 @@ function drawYearSelectionOverlay(g, x, w, h, m){
       // ⇨ Clicking this year starts or updates the time filter
       toggleYearFromLine(d.year);
     });
+        // --- Legend for single-type line chart ---
+    const legend = g.append('g')
+      .attr('class', 'line-legend')
+      // 跟 multi-type 一樣放在右上角，只是稍微靠上一點
+      .attr('transform', `translate(${w - m.r - 110},${m.t - 10})`);
 
-  // --- Legend for single-type line chart ---
-  const legend = g.append('g')
-    .attr('class', 'line-legend')
-    .attr('transform', `translate(${w - m.r - 110},${m.t - 10})`);
+    const label = typeForColor || 'All types';
+    const legendColor = typeForColor && typeColor.domain().includes(typeForColor)
+      ? typeColor(typeForColor)
+      : strokeColor;
 
-  const label = typeForColor || 'All types';
-  const legendColor = typeForColor && typeColor.domain().includes(typeForColor)
-    ? typeColor(typeForColor)
-    : strokeColor;
+    const item = legend.append('g')
+      .attr('class', 'legend-item');
 
-  const item = legend.append('g')
-    .attr('class', 'legend-item');
+    item.append('rect')
+      .attr('x', 0)
+      .attr('y', -10)
+      .attr('width', 12)
+      .attr('height', 12)
+      .attr('fill', legendColor)
+      .attr('stroke', '#333')
+      .attr('stroke-width', 0.5);
 
-  item.append('rect')
-    .attr('x', 0)
-    .attr('y', -10)
-    .attr('width', 12)
-    .attr('height', 12)
-    .attr('fill', legendColor)
-    .attr('stroke', '#333')
-    .attr('stroke-width', 0.5);
-
-  item.append('text')
-    .attr('x', 18)
-    .attr('y', 0)
-    .attr('alignment-baseline', 'middle')
-    .attr('fill', '#444')
-    .style('font-size', '11px')
-    .text(label);
-}
-
-  function renderCountLineAllTypes(rows){
-  const svg = d3.select('#countLine');
-  svg.selectAll('*').remove();
-  const w = svg.node().clientWidth  || 320;
-  const h = svg.node().clientHeight || 220;
-  const m = {t:16, r:10, b:28, l:36};
-
-  // rows are raw events (including type and year)
-  const roll = d3.rollup(
-    rows,
-    v => v.length,      // 每年事件數
-    d => d.type,
-    d => d.year
-  );
-
-  const series = Array.from(
-    roll,
-    ([type, yearMap]) => ({
-      type,
-      values: Array.from(
-        yearMap,
-        ([year, count]) => ({ year: +year, count })
-      ).sort((a, b) => a.year - b.year)
-    })
-  ).sort((a, b) => typeSet.indexOf(a.type) - typeSet.indexOf(b.type));
-
-  const allPoints = series.flatMap(s => s.values);
-  if (!allPoints.length){
-    svg.append('text')
-      .attr('x', w/2)
-      .attr('y', h/2)
-      .attr('text-anchor','middle')
-      .attr('fill','#888')
-      .text('No data');
-    return;
+    item.append('text')
+      .attr('x', 18)
+      .attr('y', 0)
+      .attr('alignment-baseline', 'middle')
+      .attr('fill', '#444')
+      .style('font-size', '11px')
+      .text(label);
   }
 
-  const x = d3.scaleLinear()
-    .domain(d3.extent(allPoints, d => d.year) || [startY,startY])
-    .nice()
-    .range([m.l, w - m.r]);
+  // Multi-type line chart: counts per year for each type
+  function renderCountLineAllTypes(rows){
+    const svg = d3.select('#countLine');
+    svg.selectAll('*').remove();
+    const w = svg.node().clientWidth  || 320;
+    const h = svg.node().clientHeight || 220;
+    const m = {t:16, r:10, b:28, l:36};
 
-  const y = d3.scaleLinear()
-    .domain([0, d3.max(allPoints, d => d.count) || 1])
-    .nice()
-    .range([h - m.b, m.t]);
+    // rows are raw events (including type and year)
+    const roll = d3.rollup(
+      rows,
+      v => v.length,      // 每年事件數
+      d => d.type,
+      d => d.year
+    );
 
-  const g = svg.append('g');
+    const series = Array.from(
+      roll,
+      ([type, yearMap]) => ({
+        type,
+        values: Array.from(
+          yearMap,
+          ([year, count]) => ({ year: +year, count })
+        ).sort((a, b) => a.year - b.year)
+      })
+    ).sort((a, b) => typeSet.indexOf(a.type) - typeSet.indexOf(b.type));
 
-  g.append('g')
-    .attr('transform', `translate(0,${h - m.b})`)
-    .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format('d')));
+    const allPoints = series.flatMap(s => s.values);
+    if (!allPoints.length){
+      svg.append('text')
+        .attr('x', w/2)
+        .attr('y', h/2)
+        .attr('text-anchor','middle')
+        .attr('fill','#888')
+        .text('No data');
+      return;
+    }
 
-  g.append('g')
-    .attr('transform', `translate(${m.l},0)`)
-    .call(d3.axisLeft(y).ticks(5));
+    const x = d3.scaleLinear()
+      .domain(d3.extent(allPoints, d => d.year) || [startY,startY])
+      .nice()
+      .range([m.l, w - m.r]);
 
-  // 🔴 加上垂直線 + 區間外變暗
-  drawYearSelectionOverlay(g, x, w, h, m);
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(allPoints, d => d.count) || 1])
+      .nice()
+      .range([h - m.b, m.t]);
 
-  const line = d3.line()
-    .x(d => x(d.year))
-    .y(d => y(d.count));
+    const g = svg.append('g');
 
-  const seriesG = g.append('g')
-    .selectAll('g.series')
-    .data(series)
-    .join('g')
-    .attr('class','series');
+    g.append('g')
+      .attr('transform', `translate(0,${h - m.b})`)
+      .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format('d')));
 
-  // Lines
-  seriesG.append('path')
-    .attr('fill','none')
-    .attr('stroke', d => typeColor(d.type))
-    .attr('stroke-width',1.8)
-    .attr('opacity',0.9)
-    .attr('d', d => line(d.values));
+    g.append('g')
+      .attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(5));
 
-  // Points
-  seriesG.append('g')
-    .selectAll('circle')
-    .data(d => d.values.map(v => ({ ...v, type: d.type })))
-    .join('circle')
-    .attr('cx', d => x(d.year))
-    .attr('cy', d => y(d.count))
-    .attr('r', d => pickedYears.has(d.year) ? 6 : 3)       // ⇨ 被選年份變大
-    .attr('fill', d => typeColor(d.type))
-    .attr('stroke','#fff')
-    .attr('stroke-width', d => pickedYears.has(d.year) ? 2 : 1)
-    .attr('opacity',0.9)
-    .style('cursor','pointer')
-    .on('mousemove', (ev, d) => {
-      tooltip
-        .style('opacity', 1)
-        .style('left', (ev.pageX + 12) + 'px')
-        .style('top', (ev.pageY + 12) + 'px')
-        .html(
-          `<div><strong>${d.type}</strong></div>` +
-          `<div>Year: ${d.year}</div>` +
-          `<div>Event count: ${d.count}</div>`
-        );
-    })
-    .on('mouseleave', () => {
-      tooltip.style('opacity', 0);
-    })
-    .on('click', (ev, d) => {
-      // ⇨ Use the same logic to toggle the selected year
-      toggleYearFromLine(d.year);
-    });
+    const line = d3.line()
+      .x(d => x(d.year))
+      .y(d => y(d.count));
 
-  // --- Legend for multi-type line chart ---
-  const legend = g.append('g')
-    .attr('class', 'line-legend')
-    .attr('transform', `translate(${w - m.r - 110},${m.t - 10})`);
+    const seriesG = g.append('g')
+      .selectAll('g.series')
+      .data(series)
+      .join('g')
+      .attr('class','series');
 
-  const legendItems = series.map(s => s.type);
+    // Lines
+    seriesG.append('path')
+      .attr('fill','none')
+      .attr('stroke', d => typeColor(d.type))
+      .attr('stroke-width',1.8)
+      .attr('opacity',0.9)
+      .attr('d', d => line(d.values));
 
-  legend.selectAll('g.legend-item')
-    .data(legendItems)
-    .join('g')
-    .attr('class', 'legend-item')
-    .attr('transform', (d,i) => `translate(0, ${i * 18})`)
-    .each(function(d){
-      const item = d3.select(this);
-      item.append('rect')
-        .attr('x', 0)
-        .attr('y', -10)
-        .attr('width', 12)
-        .attr('height', 12)
-        .attr('fill', typeColor(d))
-        .attr('stroke', '#333')
-        .attr('stroke-width', 0.5);
+    // Points
+    seriesG.append('g')
+      .selectAll('circle')
+      .data(d => d.values.map(v => ({ ...v, type: d.type })))
+      .join('circle')
+      .attr('cx', d => x(d.year))
+      .attr('cy', d => y(d.count))
+      .attr('r', d => pickedYears.has(d.year) ? 6 : 3)       // ⇨ 被選年份變大
+      .attr('fill', d => typeColor(d.type))
+      .attr('stroke','#fff')
+      .attr('stroke-width', d => pickedYears.has(d.year) ? 2 : 1)
+      .attr('opacity',0.9)
+      .style('cursor','pointer')
+      .on('mousemove', (ev, d) => {
+        tooltip
+          .style('opacity', 1)
+          .style('left', (ev.pageX + 12) + 'px')
+          .style('top', (ev.pageY + 12) + 'px')
+          .html(
+            `<div><strong>${d.type}</strong></div>` +
+            `<div>Year: ${d.year}</div>` +
+            `<div>Event count: ${d.count}</div>`
+          );
+      })
+      .on('mouseleave', () => {
+        tooltip.style('opacity', 0);
+      })
+      .on('click', (ev, d) => {
+        // ⇨ Use the same logic to toggle the selected year
+        toggleYearFromLine(d.year);
+      });
 
-      item.append('text')
-        .attr('x', 18)
-        .attr('y', 0)
-        .attr('alignment-baseline', 'middle')
-        .attr('fill', '#444')
-        .style('font-size', '11px')
-        .text(d);
-    });
-}
+    // --- Legend for multi-type line chart ---
+    const legend = g.append('g')
+      .attr('class', 'line-legend')
+      // place legend near the upper-right corner of the inner plotting area
+      .attr('transform', `translate(${w - m.r - 110},${m.t - 10})`);
+
+    const legendItems = series.map(s => s.type);
+
+    legend.selectAll('g.legend-item')
+      .data(legendItems)
+      .join('g')
+      .attr('class', 'legend-item')
+      .attr('transform', (d,i) => `translate(0, ${i * 18})`)
+      .each(function(d){
+        const item = d3.select(this);
+        item.append('rect')
+          .attr('x', 0)
+          .attr('y', -10)
+          .attr('width', 12)
+          .attr('height', 12)
+          .attr('fill', typeColor(d))
+          .attr('stroke', '#333')
+          .attr('stroke-width', 0.5);
+
+        item.append('text')
+          .attr('x', 18)
+          .attr('y', 0)
+          .attr('alignment-baseline', 'middle')
+          .attr('fill', '#444')
+          .style('font-size', '11px')
+          .text(d);
+      });
+  }
 
   // Bottom panel (line mode): average magnitude by type (barchart)
   function renderTypeBar(rows){

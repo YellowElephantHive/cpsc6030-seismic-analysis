@@ -45,11 +45,7 @@
       <svg id="map"></svg>
       <div class="tooltip" id="tooltip" style="opacity:0"></div>
       <div class="topleft">
-        <svg id="hist" width="260" height="130"></svg>
-        <div class="legend" id="legend">
-          <div class="row"><strong>Magnitude (Quantile)</strong></div>
-          <div id="legendRows"></div>
-        </div>
+        <svg id="avgMagLine" width="260" height="130"></svg>
       </div>
       <div class="credit">© Natural Earth • Map: World 1:110m • D3 rendering</div>
     </div>
@@ -61,8 +57,14 @@
         <svg id="countLine" class="sideplot"></svg>
       </div>
       <div class="card">
-        <h3 id="cardTitleB">Trends of Average Magnitude</h3>
-        <svg id="avgMagLine" class="sideplot"></svg>
+        <h3 id="cardTitleB">Magnitude distribution</h3>
+        <div class="hist-card-inner">
+          <svg id="hist" class="sideplot"></svg>
+          <div class="legend" id="legend">
+            <div class="row"><strong>Magnitude (Quantile)</strong></div>
+            <div id="legendRows"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

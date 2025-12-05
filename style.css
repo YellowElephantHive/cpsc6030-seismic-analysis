@@ -15,9 +15,15 @@ header .left-spacer, header .right-spacer { flex:1; }
 
 .tooltip{position:absolute;pointer-events:none;background:rgba(255,255,255,0.95);border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:12px;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.08);z-index: 9999;}
 
-.topleft{position:absolute;left:16px;top:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;z-index:10;pointer-events:none}
-#hist{background:rgba(255,255,255,.9);border:1px solid #eee;border-radius:10px}
-.legend{position:static;background:rgba(255,255,255,.9);border:1px solid #eee;border-radius:10px;padding:8px 10px;font-size:12px;color:#444;box-shadow:0 2px 8px rgba(0,0,0,.06);pointer-events:auto}
+.topleft{position:absolute;left:16px;top:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;z-index:10;pointer-events:auto}
+#avgMagLine{
+  background:rgba(255,255,255,.9);
+  border:1px solid #eee;
+  border-radius:10px;
+  width:320px;
+  height:180px;
+}
+.legend{background:rgba(255,255,255,.9);border:1px solid #eee;border-radius:10px;padding:8px 10px;font-size:12px;color:#444;box-shadow:0 2px 8px rgba(0,0,0,.06);pointer-events:auto}
 .legend .row{display:flex;align-items:center;gap:8px;margin:4px 0}
 .legend .dot{width:18px;height:12px;border-radius:3px;border:1px solid #cfcfcf}
 .plate-layer{pointer-events:none}
@@ -49,7 +55,7 @@ input:checked + .slider:before{transform:translateX(22px)}
 /* Responsive tweaks */
 @media (max-width:1280px){
   :root{--sidebar-w:clamp(280px,28vw,880px)}
-  #hist{transform:scale(.95);transform-origin:top left}
+  #avgMagLine{transform:scale(.95);transform-origin:top left}
 }
 @media (max-width:1100px){
   #chart{grid-template-columns:1fr}
@@ -57,7 +63,7 @@ input:checked + .slider:before{transform:translateX(22px)}
   .card{height:auto}
   svg.sideplot{height:200px;flex:none}
   .topleft{left:12px;top:12px}
-  #hist{width:220px;height:120px}
+  #avgMagLine{width:280px;height:150px}
 }
 @media (max-width:720px){
   svg.sideplot{height:180px}
@@ -106,4 +112,28 @@ label[for="yearRange"] {
 /*  Hide the 'Year' text label without affecting other labels*/
 header .control:first-of-type label {
   display: none !important;
+}
+
+.hist-card-inner{
+  position:relative;
+  flex:1;
+  display:flex;
+}
+.hist-card-inner svg{
+  width:100%;
+  height:auto;
+  flex:1;
+}
+.hist-card-inner .legend{
+  position:absolute;
+  top:8px;
+  right:8px;
+  background:rgba(255,255,255,.9);
+  border:1px solid #eee;
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:12px;
+  color:#444;
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
+  pointer-events:auto;
 }
