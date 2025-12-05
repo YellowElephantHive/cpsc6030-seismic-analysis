@@ -269,6 +269,11 @@
       titleB.textContent = 'Magnitude vs. Depth';
     }
 
+    const legendBox = document.getElementById('legend');
+    if (legendBox){
+      legendBox.style.display = (sideMode === 'line') ? 'block' : 'none';
+    }
+
     // density overlay (unchanged)
     const on = document.getElementById('togglePlates').checked;
     if (on && plateBase.length) drawPlateDensity(plateBase);
@@ -278,7 +283,7 @@
   // --- Side scatters (Magnitude vs Horizontal Distance / Depth) ---
   function renderScatterPanels(rows){
     drawScatter('#countLine', rows, d => d.hdist, 'Horizontal Distance');
-    drawScatter('#avgMagLine', rows, d => d.depth1, 'Depth');
+    drawScatter('#hist', rows, d => d.depth1, 'Depth');
   }
 
   function drawScatter(sel, rows, xAccessor, xLabel){
