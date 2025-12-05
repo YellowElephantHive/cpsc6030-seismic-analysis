@@ -36,6 +36,7 @@
   // side panel mode: 'line' (default) or 'scatter'
   let sideMode = 'line';
   let selectedType = null; // currently selected type from the barchart (or null = all)
+  let selectedMagRange = null; // currently selected magnitude bin {min, max} from the histogram
   const toggleSide = document.getElementById('toggleSideMode');
   let pickedYears = new Set();          // Currently selected years (0, 1, or 2 years)
   let baseYearRange = null;
@@ -190,7 +191,8 @@
     );
   }
 
-  function baseFiltered(){
+  // Base filter: only year range + type checkboxes
+  function baseFilteredCore(){
     const minY = +yearMinInp.value;
     const maxY = +yearMaxInp.value;
     const tset = activeTypes();
@@ -202,6 +204,16 @@
     );
   }
 
+  // Extended filter: apply magnitude range if selected, using per-bin min/max
+  function baseFiltered(){
+    const core = baseFilteredCore();
+    if (!selectedMagRange) return core;
+    return core.filter(d =>
+      d.mag >= selectedMagRange.min &&
+      d.mag <  selectedMagRange.max + 1e-6
+    );
+  }
+
   function filtered(){
     const base = baseFiltered();
     if (!selectedType) return base;
@@ -209,8 +221,17 @@
   }
 
   function render(){
-    // baseMap: respects current yearMin/yearMax + type checkboxes (for map / histogram / bar)
-    const baseMap = baseFiltered();
+    // baseCore: respects current yearMin/yearMax + type checkboxes (for histogram / bar)
+    const baseCore = baseFilteredCore();
+
+    // baseMap: additionally applies magnitude filter for map / side panels
+    const baseMap = selectedMagRange
+      ? baseCore.filter(d =>
+          d.mag >= selectedMagRange.min &&
+          d.mag <  selectedMagRange.max + 1e-6
+        )
+      : baseCore;
+
     const pts  = selectedType ? baseMap.filter(d => d.type === selectedType) : baseMap;
 
     // baseLine: ignores yearMin/yearMax, only applies type checkboxes
@@ -238,8 +259,9 @@
         exit => exit.transition().duration(200).attr('r', 0).remove()
       );
 
-    // histogram (subset)
-    renderMagnitudeHistogram(pts.map(d => d.mag), qBreaks, colorQuant);
+    // histogram: use full distribution under year + type filters (no mag filter),
+    // but visually highlight the selected magnitude bin
+    renderMagnitudeHistogram(baseCore.map(d => d.mag), qBreaks, colorQuant);
 
     if (sideMode === 'line'){
       if (selectedType){
@@ -437,11 +459,12 @@
   }
 
   // Histogram of magnitudes
-  function renderMagnitudeHistogram(allMags, breaks, colorScale){
+  // Histogram of magnitudes
+function renderMagnitudeHistogram(allMags, breaks, colorScale){
   const svgH = d3.select('#hist');
   svgH.selectAll('*').remove();
 
-  // ✅ 用實際的 SVG 大小，而不是固定 260×130
+  // 用實際 SVG 尺寸
   const w = svgH.node().clientWidth  || 320;
   const h = svgH.node().clientHeight || 220;
   const m = { t:16, r:12, b:26, l:34 };
@@ -457,13 +480,13 @@
     return;
   }
 
-  // X axis: use global magExtent so the range stays consistent
+  // 這裡用全域 magExtent，確保 X 範圍一致
   const x = d3.scaleLinear()
     .domain(magExtent)
     .nice()
     .range([m.l, w - m.r]);
 
-  // Binning
+  // 20 等寬 bins（保持原本形狀）
   const bins = d3.bin()
     .domain(magExtent)
     .thresholds(20)(allMags);
@@ -472,11 +495,15 @@
     .domain([0, d3.max(bins, b => b.length)]).nice()
     .range([h - m.b, m.t]);
 
-  const barPad    = 0.25;  // Gap ratio for regular bars
-  const firstPad  = 0.10;  // Smaller gap for the first bar so it looks wider
-  const leftGapPx = 4;     // Shift all bars slightly to the right
+  const barPad    = 0.25;
+  const firstPad  = 0.10;
+  const leftGapPx = 4;
 
   const gBars = svgH.append('g');
+
+  // 這裡用 breaks 來定義 quantile 邊界（和 legend 一致）
+  const q1 = breaks[1];
+  const q2 = breaks[2];
 
   gBars.selectAll('rect')
     .data(bins)
@@ -502,30 +529,67 @@
         ? '#fdd49e'
         : colorScale((d.x0 + d.x1) / 2)
     )
-    .attr('stroke', '#e6e6e6');
+    // 🔹 高亮選中的 bin，其他變暗（根據 binMin/binMax）
+    .attr('opacity', d => {
+      if (!selectedMagRange) return 1;
+      return (d.x0 === selectedMagRange.binMin && d.x1 === selectedMagRange.binMax) ? 1 : 0.35;
+    })
+    .attr('stroke', d => {
+      if (!selectedMagRange) return '#e6e6e6';
+      return (d.x0 === selectedMagRange.binMin && d.x1 === selectedMagRange.binMax)
+        ? '#333'
+        : '#e6e6e6';
+    })
+    .attr('stroke-width', d => {
+      if (!selectedMagRange) return 1;
+      return (d.x0 === selectedMagRange.binMin && d.x1 === selectedMagRange.binMax) ? 1.5 : 1;
+    })
+    .style('cursor', 'pointer')
+    .on('click', (ev, d) => {
+      // Toggle by bin identity (x0/x1)
+      const isSame =
+        selectedMagRange &&
+        selectedMagRange.binMin === d.x0 &&
+        selectedMagRange.binMax === d.x1;
 
-  // X axis (magnitude)
+      if (isSame){
+        selectedMagRange = null;
+      }else{
+        // Decide which quantile band this bin belongs to based on its center
+        const mid  = (d.x0 + d.x1) / 2;
+        const band = (mid < q1) ? 0 : (mid < q2 ? 1 : 2);
+
+        // Quantile band boundaries
+        const bandMin = (band === 0 ? magExtent[0] : (band === 1 ? q1 : q2));
+        const bandMax = (band === 0 ? q1 : (band === 1 ? q2 : magExtent[1]));
+
+        // Effective numeric filter range: bin range clipped to its band
+        const min = Math.max(d.x0, bandMin);
+        const max = Math.min(d.x1, bandMax);
+
+        selectedMagRange = {
+          min,    // used for filtering earthquakes
+          max,
+          binMin: d.x0, // used for bar highlighting
+          binMax: d.x1
+        };
+      }
+      render();
+    });
+
+  // X 軸
   svgH.append('g')
     .attr('transform', `translate(0,${h - m.b})`)
     .call(d3.axisBottom(x).ticks(5))
     .selectAll('text')
     .style('font-size','10px');
 
-  // Y axis (counts)
+  // Y 軸
   svgH.append('g')
     .attr('transform', `translate(${m.l},0)`)
     .call(d3.axisLeft(y).ticks(4))
     .selectAll('text')
     .style('font-size','10px');
-
-  // Title
-  //svgH.append('text')
-  //  .attr('x', m.l)
-  //  .attr('y', m.t - 6)
-  //  .attr('fill','#444')
-  //  .attr('font-weight',600)
-  //  .attr('font-size',12)
-  //  .text('Magnitude distribution');
 }
 
     // ⇨ When a year is clicked in the line chart, update yearMin / yearMax / slider and pickedYears
