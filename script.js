@@ -234,9 +234,16 @@
 
     const pts  = selectedType ? baseMap.filter(d => d.type === selectedType) : baseMap;
 
-    // baseLine: ignores yearMin/yearMax, only applies type checkboxes
+    // baseLine: ignores yearMin/yearMax, but follows type checkboxes AND magnitude selection
     const tsetForLine = activeTypes();
-    const baseLine = clean.filter(d => tsetForLine.has(d.type));
+    let baseLine = clean.filter(d => tsetForLine.has(d.type));
+
+    if (selectedMagRange) {
+      baseLine = baseLine.filter(d =>
+      d.mag >= selectedMagRange.min &&
+      d.mag <  selectedMagRange.max + 1e-6
+      );
+    }
 
     // map points
     gPoints.selectAll('circle')
@@ -265,14 +272,14 @@
 
     if (sideMode === 'line'){
       if (selectedType){
-        // 單一 type：線圖使用完整年份，但只看目前選取的 type
+        // Single type: use the full time span but only for the currently selected type
         const yearly = aggregateByYear(baseLine.filter(d => d.type === selectedType));
         renderCountLine(yearly, selectedType);
       }else{
-        // 多 type：線圖使用完整年份的所有 type
+        // Multiple types: use the full time span for all types
         renderCountLineAllTypes(baseLine);
       }
-      // barchart 仍然跟著目前 yearMin/yearMax 的範圍
+      // The barchart still follows the current yearMin/yearMax range
       renderTypeBar(baseMap);
     }else{
       renderScatterPanels(pts);
@@ -480,13 +487,13 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
     return;
   }
 
-  // 這裡用全域 magExtent，確保 X 範圍一致
+  // Use the global magExtent so the X range stays consistent
   const x = d3.scaleLinear()
     .domain(magExtent)
     .nice()
     .range([m.l, w - m.r]);
 
-  // 20 等寬 bins（保持原本形狀）
+  // 20 equal-width bins (preserving the overall shape)
   const bins = d3.bin()
     .domain(magExtent)
     .thresholds(20)(allMags);
@@ -501,7 +508,7 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
 
   const gBars = svgH.append('g');
 
-  // 這裡用 breaks 來定義 quantile 邊界（和 legend 一致）
+  // Use breaks to define quantile boundaries (consistent with the legend)
   const q1 = breaks[1];
   const q2 = breaks[2];
 
@@ -529,7 +536,7 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
         ? '#fdd49e'
         : colorScale((d.x0 + d.x1) / 2)
     )
-    // 🔹 高亮選中的 bin，其他變暗（根據 binMin/binMax）
+    // Highlight the selected bin and dim the others (based on binMin/binMax)
     .attr('opacity', d => {
       if (!selectedMagRange) return 1;
       return (d.x0 === selectedMagRange.binMin && d.x1 === selectedMagRange.binMax) ? 1 : 0.35;
@@ -577,14 +584,14 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
       render();
     });
 
-  // X 軸
+  // X Axis
   svgH.append('g')
     .attr('transform', `translate(0,${h - m.b})`)
     .call(d3.axisBottom(x).ticks(5))
     .selectAll('text')
     .style('font-size','10px');
 
-  // Y 軸
+  // Y Axis
   svgH.append('g')
     .attr('transform', `translate(${m.l},0)`)
     .call(d3.axisLeft(y).ticks(4))
@@ -596,7 +603,7 @@ function renderMagnitudeHistogram(allMags, breaks, colorScale){
 function toggleYearFromLine(year) {
   year = +year;
 
-  // ✅ 1. If two different years are already selected and a third different year is clicked, ignore it
+  // 1. If two different years are already selected and a third different year is clicked, ignore it
   //    - Allowed cases: clicking an already selected year (to unselect), or when fewer than 2 years are selected
   if (!pickedYears.has(year) && pickedYears.size >= 2) {
     return;
@@ -645,7 +652,7 @@ function toggleYearFromLine(year) {
   render();
 }
 
-// 在 toggleYearFromLine(...) 後面加這個 helper
+// Helper to draw the year selection overlay after toggleYearFromLine(...)
 function drawYearSelectionOverlay(g, x, w, h, m){
   if (pickedYears.size === 0) return;
 
@@ -659,7 +666,7 @@ function drawYearSelectionOverlay(g, x, w, h, m){
     .attr('class', 'year-selection-layer')
     .style('pointer-events', 'none');
 
-  // 1) 先畫垂直紅線（1 或 2 條）
+  // 1) First draw vertical red lines (one or two)
   yearsSel.forEach(yr => {
     const xPos = x(yr);
     if (!Number.isFinite(xPos)) return;
@@ -673,14 +680,14 @@ function drawYearSelectionOverlay(g, x, w, h, m){
       .attr('stroke-dasharray', '4,3');
   });
 
-  // 2) 如果剛好選了兩個年份，區間外變暗
+  // 2) If exactly two years are selected, dim the regions outside the interval
   if (yearsSel.length === 2){
     const minY = yearsSel[0];
     const maxY = yearsSel[1];
     const xMin = x(minY);
     const xMax = x(maxY);
 
-    // 左側（min 年以前）
+    // Left side (years before the minimum selected year)
     const leftW = xMin - xStart;
     if (leftW > 0){
       layer.append('rect')
@@ -691,7 +698,7 @@ function drawYearSelectionOverlay(g, x, w, h, m){
         .attr('fill', 'rgba(0,0,0,0.05)');
     }
 
-    // 右側（max 年以後）
+    // Right side (years after the maximum selected year)
     const rightW = xEnd - xMax;
     if (rightW > 0){
       layer.append('rect')
@@ -739,7 +746,7 @@ function drawYearSelectionOverlay(g, x, w, h, m){
     .attr('transform', `translate(${m.l},0)`)
     .call(d3.axisLeft(y).ticks(5));
 
-  // 🔴 在這裡加上垂直線 + 區間外變暗
+  // Add vertical lines here and dim the regions outside the selected interval
   drawYearSelectionOverlay(g, x, w, h, m);
 
   const strokeColor = typeForColor && typeColor.domain().includes(typeForColor)
@@ -832,7 +839,7 @@ function drawYearSelectionOverlay(g, x, w, h, m){
   // rows are raw events (including type and year)
   const roll = d3.rollup(
     rows,
-    v => v.length,      // 每年事件數
+    v => v.length,      // Number of events per year
     d => d.type,
     d => d.year
   );
@@ -879,7 +886,7 @@ function drawYearSelectionOverlay(g, x, w, h, m){
     .attr('transform', `translate(${m.l},0)`)
     .call(d3.axisLeft(y).ticks(5));
 
-  // 🔴 加上垂直線 + 區間外變暗
+  // Add vertical lines and dim the regions outside the selected interval
   drawYearSelectionOverlay(g, x, w, h, m);
 
   const line = d3.line()
@@ -907,7 +914,7 @@ function drawYearSelectionOverlay(g, x, w, h, m){
     .join('circle')
     .attr('cx', d => x(d.year))
     .attr('cy', d => y(d.count))
-    .attr('r', d => pickedYears.has(d.year) ? 6 : 3)       // ⇨ 被選年份變大
+    .attr('r', d => pickedYears.has(d.year) ? 6 : 3)       // ⇨ Enlarge points for selected years
     .attr('fill', d => typeColor(d.type))
     .attr('stroke','#fff')
     .attr('stroke-width', d => pickedYears.has(d.year) ? 2 : 1)
@@ -1015,8 +1022,8 @@ function drawYearSelectionOverlay(g, x, w, h, m){
       .call(d3.axisBottom(x))
       .selectAll('text')
       .style('font-size', '10px')
-      .attr('text-anchor', 'middle')   // 水平置中
-      .attr('transform', null);        // 取消旋轉
+      .attr('text-anchor', 'middle')   
+      .attr('transform', null);        
 
     g.append('g')
       .attr('transform', `translate(${m.l},0)`)
