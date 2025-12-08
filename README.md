@@ -5,7 +5,7 @@
 Watch the full interactive demo here:  
 [https://vimeo.com/1144394294](https://vimeo.com/1144394294)
 
-<iframe src="https://player.vimeo.com/video/1144394294" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
+[![Demo Video](./demo_thumbnail.png)](https://vimeo.com/1144394294)
 
 ---
 
