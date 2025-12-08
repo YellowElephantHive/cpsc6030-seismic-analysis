@@ -1,5 +1,14 @@
 # Seismic Analysis — Interactive Earthquake Visualization (D3.js)
 
+<!-- Demo Video -->
+## 🎥 Demo Video
+Watch the full interactive demo here:  
+[https://vimeo.com/1144394294](https://vimeo.com/1144394294)
+
+<iframe src="https://player.vimeo.com/video/1144394294" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
+
+---
+
 This project is an interactive visualization of global earthquake activity (1900–2016) built with **D3.js v7**. It provides intuitive tools to explore earthquakes across **time**, **location**, **magnitude**, **depth**, and **event types**, supported by interactive filtering and dynamic visual encodings.
 
 ---
