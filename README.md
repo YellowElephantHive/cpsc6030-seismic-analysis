@@ -128,6 +128,7 @@ Clone the repository:
 ```
 git clone https://github.com/YOUR_USERNAME/seismic-analysis.git
 cd seismic-analysis
+python3 -m http.server 8000
 ```
 
 Start a local server (CSV loading requires HTTP):
